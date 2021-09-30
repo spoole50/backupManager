@@ -6,8 +6,9 @@ from zlib import crc32
 import pprint
 from timeit import default_timer as timer
 from datetime import timedelta
+import hashlib
 
-_RunStats = {'start':0, 'end':0, 'totFiles':0, 'totSize':0, 'fileDict': {}}
+_RunStats = {'start':0, 'totFiles':0, 'totSize':0, 'fileDict': {}}
 
 def generateParse():
     parser = argparse.ArgumentParser()
@@ -27,16 +28,24 @@ def sizeof_fmt(num, suffix="B"):
         num /= 1024.0
     return f"{num:.1f}Yi{suffix}"
 
-def genHash(fName, verbose=True):
+def genHash(fName, hashAlgo='crc32', blockChunk=128, verbose=True):
     resHash = 0
+    read_data = 1
     fSize = os.path.getsize(fName)
+    if hashAlgo != 'crc32':
+        _hash = hashlib.new(hashAlgo)
     with open(fName, 'rb') as inFile:
         while True:
-            read_data = inFile.read(25165824)
             if not read_data:
                 break
-            else:
+            elif hashAlgo == 'crc32':
+                read_data = inFile.read(8192)
                 resHash = crc32(read_data, resHash)
+            else:
+                read_data = inFile.read(_hash.block_size * blockChunk)
+                _hash.update(read_data)
+    if hashAlgo != 'crc32':
+        resHash = _hash.hexdigest()
     if verbose:
         print(f"{resHash} - {sizeof_fmt(fSize)} - {fName}")
     return resHash, fSize
@@ -48,30 +57,32 @@ def processBackup():
 
     for subdir, dirs, files in os.walk(srcPath):
         for cFile in files:
-            
-            srcFile = os.path.join(subdir, cFile)
-            targetSubdir = os.path.join(targetPath, os.path.relpath(subdir, srcPath))
-            # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
-            targetFile = os.path.join(targetSubdir, cFile)
-            crc_hash, tSize = genHash(srcFile)
-            _RunStats['totSize'] += tSize
-            _RunStats['totFiles'] += 1
-            if crc_hash not in _RunStats['fileDict']:
-                _RunStats['fileDict'][crc_hash] = [srcFile]
-            else:
-                _RunStats['fileDict'][crc_hash].append(srcFile)
-            # os.makedirs(targetSubdir, exist_ok=True)
-            # shutil.copy2(srcFullPath, targetFile)
-            # print(f"File: {crc_hash:x} - {srcFile}\n\tOutputSubdir: {targetSubdir}")   
+            if _RunStats['totFiles'] < 10:
+                srcFile = os.path.join(subdir, cFile)
+                targetSubdir = os.path.join(targetPath, os.path.relpath(subdir, srcPath))
+                # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
+                targetFile = os.path.join(targetSubdir, cFile)
+                crc_hash, tSize = genHash(srcFile)
+                if crc_hash not in _RunStats['fileDict']:
+                    _RunStats['fileDict'][crc_hash] = [srcFile]
+                else:
+                    _RunStats['fileDict'][crc_hash].append(srcFile)
+                _RunStats['totSize'] += tSize
+                _RunStats['totFiles'] += 1
+                # os.makedirs(targetSubdir, exist_ok=True)
+                # shutil.copy2(srcFullPath, targetFile)
+                # print(f"File: {crc_hash:x} - {srcFile}\n\tOutputSubdir: {targetSubdir}")   
 
 def sumReport():
     pp = pprint.PrettyPrinter()
     _RunStats['end'] = timer()
+    totalTime = timedelta(seconds=timer() - _RunStats['start'])
 
     print(f"""\n\nSummary Report:
-    Elapsed Time: {timedelta(seconds=_RunStats['end'] - _RunStats['start'])}
+    Elapsed Time: {str(totalTime):10.10s}
     Files Scanned: {_RunStats['totFiles']}
     Total Size: {sizeof_fmt(_RunStats['totSize'])}
+    Avg. Tranfer Speed: {sizeof_fmt(_RunStats['totSize']/totalTime.total_seconds())}/s
     \nFiles Indexed:\n""")
 
     pp.pprint(_RunStats['fileDict'])
@@ -80,11 +91,14 @@ def main():
     _RunStats['start'] = timer()
     try:
         processBackup()
+        sumReport()
+    except OSError:
+        print("Error ")
+        print (OSError)
     except KeyboardInterrupt:
         sumReport()
-        sys.exit(0)
-    finally:
-        sumReport()
+    sys.exit(0)
+        
         
 
 if __name__ == '__main__':
