@@ -28,7 +28,7 @@ def sizeof_fmt(num, suffix="B"):
         num /= 1024.0
     return f"{num:.1f}Yi{suffix}"
 
-def genHash(fName, hashAlgo='crc32', blockChunk=128, verbose=True):
+def genHash(fName, hashAlgo='crc32', blockChunk=128, verbose=None):
     resHash = 0
     read_data = 1
     fSize = os.path.getsize(fName)
@@ -46,9 +46,18 @@ def genHash(fName, hashAlgo='crc32', blockChunk=128, verbose=True):
                 _hash.update(read_data)
     if hashAlgo != 'crc32':
         resHash = _hash.hexdigest()
-    if verbose:
+    if verbose == 1:
+        print(f"{resHash} - {sizeof_fmt(fSize)}")
+    if verbose == 2:
         print(f"{resHash} - {sizeof_fmt(fSize)} - {fName}")
     return resHash, fSize
+
+def getYN():
+    ans = input()
+    if ans in ['Y', 'y']:
+        return True
+    else:
+        return False
 
 def processBackup():
     args = generateParse()
@@ -57,12 +66,12 @@ def processBackup():
 
     for subdir, dirs, files in os.walk(srcPath):
         for cFile in files:
-            if _RunStats['totFiles'] < 10:
+            try:
                 srcFile = os.path.join(subdir, cFile)
                 targetSubdir = os.path.join(targetPath, os.path.relpath(subdir, srcPath))
                 # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
                 targetFile = os.path.join(targetSubdir, cFile)
-                crc_hash, tSize = genHash(srcFile)
+                crc_hash, tSize = genHash(srcFile, hashAlgo='md5', verbose=1)
                 if crc_hash not in _RunStats['fileDict']:
                     _RunStats['fileDict'][crc_hash] = [srcFile]
                 else:
@@ -71,11 +80,18 @@ def processBackup():
                 _RunStats['totFiles'] += 1
                 # os.makedirs(targetSubdir, exist_ok=True)
                 # shutil.copy2(srcFullPath, targetFile)
-                # print(f"File: {crc_hash:x} - {srcFile}\n\tOutputSubdir: {targetSubdir}")   
+                print(f"File: {crc_hash:x} - {srcFile}\n\tOutputSubdir: {targetSubdir}")
+            except OSError as oe:
+                print(f"\n{oe}\n\nContinue to next file? (Y/N):")
+                if getYN():
+                    continue
+                else:
+                    raise KeyboardInterrupt
+            except Exception as e:
+                print(f"WTF Happened Hurr:\n{e}")
+                
 
-def sumReport():
-    pp = pprint.PrettyPrinter()
-    _RunStats['end'] = timer()
+def sumReport(printDict=False):
     totalTime = timedelta(seconds=timer() - _RunStats['start'])
 
     print(f"""\n\nSummary Report:
@@ -83,18 +99,22 @@ def sumReport():
     Files Scanned: {_RunStats['totFiles']}
     Total Size: {sizeof_fmt(_RunStats['totSize'])}
     Avg. Tranfer Speed: {sizeof_fmt(_RunStats['totSize']/totalTime.total_seconds())}/s
-    \nFiles Indexed:\n""")
+    """)
 
-    pp.pprint(_RunStats['fileDict'])
+    if printDict:
+        print("\nFile Hash Dictionary:")
+        pp = pprint.PrettyPrinter()
+        pp.pprint(_RunStats['fileDict'])
 
 def main():
     _RunStats['start'] = timer()
     try:
         processBackup()
         sumReport()
-    except OSError:
-        print("Error ")
-        print (OSError)
+    except OSError as e:
+        sumReport()
+        print("\nOS Error:")
+        print (e)
     except KeyboardInterrupt:
         sumReport()
     sys.exit(0)
