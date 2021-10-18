@@ -1,4 +1,5 @@
 import argparse
+from posixpath import abspath
 import sys
 import os
 import shutil
@@ -12,22 +13,26 @@ _RunStats = {'start':0,
             'totFiles':0,
             'totSize':0,
             'hashAlgo':'crc32',
+            'logFilePath': '',
             'fileDict': {},
             'flags':{
-                'move':0
+                'move': False
             }}
 
 def generateParse():
     parser = argparse.ArgumentParser()
     parser.add_argument('SRC' ,
                         type=str,
-                        help='Parent Folder to begin copy operation')
+                        help='Parent Folder Path to begin copy operation')
     parser.add_argument('TARGET',
                         type=str,
-                        help='Destination for copy operation')
+                        help='Destination Path for copy/move operation')
     parser.add_argument('-a', '--algorithm',
                         type=str,
                         help='Algorithm to utilize for generation of file hashes')
+    parser.add_argument('-o', '--logOutput',
+                        type=str,
+                        help='Output Path for log file')
     args = parser.parse_args()
     return args
 
@@ -35,8 +40,13 @@ def parseArgs():
     args = generateParse()
     srcPath = os.path.abspath(args.SRC)
     targetPath = os.path.abspath(args.TARGET)
+
     if args.algorithm is not None:
         _RunStats['hashAlgo'] = args.algorithm
+    if args.logOutput is not None:
+        _RunStats['logFilePath'] = os.path.abspath(args.logOutput)
+    else:
+        _RunStats['logFilePath'] = os.path.join(targetPath, 'bM.log')
     return srcPath, targetPath
 
 def sizeof_fmt(num, suffix="B"):
@@ -78,21 +88,27 @@ def getYN():
         return False
 
 def processBackup():
-    srcPath, targetPath = parseArgs()
+    srcPath, targetPath, logPath = parseArgs()
     for subdir, dirs, files in os.walk(srcPath):
         for cFile in files:
             try:
+                # Generate Full File Paths
                 srcFile = os.path.join(subdir, cFile)
                 targetSubdir = os.path.join(targetPath, os.path.relpath(subdir, srcPath))
-                # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
                 targetFile = os.path.join(targetSubdir, cFile)
+                # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
+
+                # Generate Current File Hash
                 crc_hash, tSize = genHash(srcFile, _RunStats['hashAlgo'], verbose=1)
+
+                # Add to File Hash Dictionary
                 if crc_hash not in _RunStats['fileDict']:
                     _RunStats['fileDict'][crc_hash] = [srcFile]
                 else:
                     _RunStats['fileDict'][crc_hash].append(srcFile)
                 _RunStats['totSize'] += tSize
                 _RunStats['totFiles'] += 1
+
                 # os.makedirs(targetSubdir, exist_ok=True)
                 # shutil.copy2(srcFullPath, targetFile)
                 print(f"{'Source:': <13} {srcFile}\n{'OutputSubdir:': <13} {targetFile}\n")
@@ -113,7 +129,7 @@ def sumReport(printDict=False):
     Elapsed Time: {str(totalTime):10.10s}
     Files Scanned: {_RunStats['totFiles']}
     Total Size: {sizeof_fmt(_RunStats['totSize'])}
-    Avg. Tranfer Speed: {sizeof_fmt(_RunStats['totSize']/totalTime.total_seconds())}/s
+    Avg. Transfer Speed: {sizeof_fmt(_RunStats['totSize']/totalTime.total_seconds())}/s
     File Hash Algorithm: {_RunStats['hashAlgo']}
     """)
 
@@ -125,7 +141,6 @@ def sumReport(printDict=False):
 def main():
     _RunStats['start'] = timer()
     try:
-        parseArgs()
         processBackup()
         sumReport()
     except OSError as e:
@@ -136,7 +151,5 @@ def main():
         sumReport()
     sys.exit(0)
         
-        
-
 if __name__ == '__main__':
     main()
