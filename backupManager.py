@@ -1,9 +1,5 @@
-
-from posixpath import abspath
-import sys
-# import shutil
-from globals import _RunStats
 from bmHelper import *
+import config
 
 def processBackup():
     srcPath, targetPath = parseArgs()
@@ -17,15 +13,15 @@ def processBackup():
                 # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
 
                 # Generate Current File Hash
-                crc_hash, tSize = genHash(srcFile, _RunStats['hashAlgo'], verbose=1)
+                crc_hash, tSize = genHash(srcFile, config._RunStats['hashAlgo'], verbose=1)
 
                 # Add to File Hash Dictionary
-                if crc_hash not in _RunStats['fileDict']:
-                    _RunStats['fileDict'][crc_hash] = [srcFile]
+                if crc_hash not in config._RunStats['fileDict']:
+                    config._RunStats['fileDict'][crc_hash] = [srcFile]
                 else:
-                    _RunStats['fileDict'][crc_hash].append(srcFile)
-                _RunStats['totSize'] += tSize
-                _RunStats['totFiles'] += 1
+                    config._RunStats['fileDict'][crc_hash].append(srcFile)
+                config._RunStats['totSize'] += tSize
+                config._RunStats['totFiles'] += 1
 
                 # os.makedirs(targetSubdir, exist_ok=True)
                 # shutil.copy2(srcFullPath, targetFile)
@@ -40,7 +36,8 @@ def processBackup():
                 print(f"WTF Happened Hurr:\n{e}")
 
 def main():
-    _RunStats['start'] = timer()
+    config.init()
+    config._RunStats['start'] = timer()
     try:
         processBackup()
         sumReport()

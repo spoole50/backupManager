@@ -1,10 +1,13 @@
+import sys
 import argparse
 import hashlib
 import os
+import pprint
 from zlib import crc32
 from datetime import timedelta
 from timeit import default_timer as timer
-from globals import _RunStats
+import config
+
 
 def generateParse():
     parser = argparse.ArgumentParser()
@@ -29,11 +32,11 @@ def parseArgs():
     targetPath = os.path.abspath(args.TARGET)
 
     if args.algorithm is not None:
-        _RunStats['hashAlgo'] = args.algorithm
+        config._RunStats['hashAlgo'] = args.algorithm
     if args.logOutput is not None:
-        _RunStats['logFilePath'] = os.path.abspath(args.logOutput)
+        config._RunStats['logFilePath'] = os.path.abspath(args.logOutput)
     else:
-        _RunStats['logFilePath'] = os.path.join(targetPath, 'bM.log')
+        config._RunStats['logFilePath'] = os.path.join(targetPath, 'bM.log')
     return srcPath, targetPath
 
 def sizeof_fmt(num, suffix="B"):
@@ -75,17 +78,17 @@ def getYN():
         return False
 
 def sumReport(printDict=False):
-    totalTime = timedelta(seconds=timer() - _RunStats['start'])
+    totalTime = timedelta(seconds=timer() - config._RunStats['start'])
 
     print(f"""\n\nSummary Report:
     Elapsed Time: {str(totalTime):10.10s}
-    Files Scanned: {_RunStats['totFiles']}
-    Total Size: {sizeof_fmt(_RunStats['totSize'])}
-    Avg. Transfer Speed: {sizeof_fmt(_RunStats['totSize']/totalTime.total_seconds())}/s
-    File Hash Algorithm: {_RunStats['hashAlgo']}
+    Files Scanned: {config._RunStats['totFiles']}
+    Total Size: {sizeof_fmt(config._RunStats['totSize'])}
+    Avg. Transfer Speed: {sizeof_fmt(config._RunStats['totSize']/totalTime.total_seconds())}/s
+    File Hash Algorithm: {config._RunStats['hashAlgo']}
     """)
 
     if printDict:
         print("\nFile Hash Dictionary:")
         pp = pprint.PrettyPrinter()
-        pp.pprint(_RunStats['fileDict'])
+        pp.pprint(config._RunStats['fileDict'])
