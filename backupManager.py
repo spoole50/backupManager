@@ -27,7 +27,7 @@ def processBackup():
                 # shutil.copy2(srcFullPath, targetFile)
                 print(f"{'Source:': <13} {srcFile}\n{'OutputSubdir:': <13} {targetFile}\n")
             except OSError as oe:
-                print(f"\n{oe}\n\nContinue to next file? (Y/N):")
+                print(f"\n{oe}\n\nContinue to next file? (Y/N):", file=sys.stderr)
                 if getYN():
                     continue
                 else:

@@ -8,10 +8,9 @@ from datetime import timedelta
 from timeit import default_timer as timer
 import config
 
-
 def generateParse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('SRC' ,
+    parser.add_argument('SRC',
                         type=str,
                         help='Parent Folder Path to begin copy operation')
     parser.add_argument('TARGET',
@@ -23,6 +22,9 @@ def generateParse():
     parser.add_argument('-o', '--logOutput',
                         type=str,
                         help='Output Path for log file')
+    parser.add_argument('-v', '--verbose',
+                        type=int,
+                        help="Verbosity level (0-1), Default 0")
     args = parser.parse_args()
     return args
 
@@ -33,10 +35,17 @@ def parseArgs():
 
     if args.algorithm is not None:
         config._RunStats['hashAlgo'] = args.algorithm
+
     if args.logOutput is not None:
         config._RunStats['logFilePath'] = os.path.abspath(args.logOutput)
     else:
         config._RunStats['logFilePath'] = os.path.join(targetPath, 'bM.log')
+
+    if args.verbose:
+        config._RunStats['flags']['verbose'] = args.verbose
+    else:
+        config._RunStats['flags']['verbose'] = 0
+
     return srcPath, targetPath
 
 def sizeof_fmt(num, suffix="B"):
