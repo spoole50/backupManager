@@ -4,7 +4,7 @@ import hashlib
 import os
 import pprint
 from zlib import crc32
-from datetime import timedelta
+from datetime import timedelta, datetime
 from timeit import default_timer as timer
 import config
 
@@ -28,21 +28,37 @@ def generateParse():
     args = parser.parse_args()
     return args
 
+def initLog(logPath):
+    try:
+        lgFile = open(logPath, 'a+')
+        config._RunStats['logFile'] = lgFile
+
+        lgFile.write(f"""\n{datetime.now():%Y-%b-%d %H:%M:%S}
+By User: {os.path.split(os.path.expanduser('~'))[-1]}\n\n""")
+
+    except Exception as e:
+        print(f"OpenLogFileError:\n{e}")
+        raise KeyboardInterrupt
+
 def parseArgs():
     args = generateParse()
     srcPath = os.path.abspath(args.SRC)
     targetPath = os.path.abspath(args.TARGET)
+    for path in [srcPath, targetPath]:
+        if not os.path.isdir(path):
+            print(f"{path}\nNot a valid directory path, please try again")
+            raise KeyboardInterrupt
 
     if args.algorithm is not None:
         config._RunStats['hashAlgo'] = args.algorithm
 
     if args.logOutput is not None:
-        config._RunStats['logFilePath'] = os.path.abspath(args.logOutput)
+        initLog(os.path.abspath(args.logOutput))
     else:
-        config._RunStats['logFilePath'] = os.path.join(targetPath, 'bM.log')
-
+        initLog(os.path.join(targetPath, 'bM.log'))
+    
     if args.verbose:
-        config._RunStats['flags']['verbose'] = args.verbose
+        config._RunStats['flags']['verbose'] = int(args.verbose)
     else:
         config._RunStats['flags']['verbose'] = 0
 
@@ -66,17 +82,15 @@ def genHash(fName, hashAlgo, blockChunk=128, verbose=None):
             if not read_data:
                 break
             elif hashAlgo == 'crc32':
-                read_data = inFile.read(8192)
+                read_data = inFile.read(1048576)
                 resHash = crc32(read_data, resHash)
             else:
                 read_data = inFile.read(_hash.block_size * blockChunk)
                 _hash.update(read_data)
     if hashAlgo != 'crc32':
         resHash = _hash.hexdigest()
-    if verbose == 1:
-        print(f"{resHash} - {sizeof_fmt(fSize)}")
-    if verbose == 2:
-        print(f"{resHash} - {sizeof_fmt(fSize)} - {fName}")
+    
+    logEvent(f"{resHash} - {sizeof_fmt(fSize)} - {fName}")
     return resHash, fSize
 
 def getYN():
@@ -89,7 +103,7 @@ def getYN():
 def sumReport(printDict=False):
     totalTime = timedelta(seconds=timer() - config._RunStats['start'])
 
-    print(f"""\n\nSummary Report:
+    logEvent(f"""\n\nSummary Report:
     Elapsed Time: {str(totalTime):10.10s}
     Files Scanned: {config._RunStats['totFiles']}
     Total Size: {sizeof_fmt(config._RunStats['totSize'])}
@@ -101,3 +115,12 @@ def sumReport(printDict=False):
         print("\nFile Hash Dictionary:")
         pp = pprint.PrettyPrinter()
         pp.pprint(config._RunStats['fileDict'])
+
+def logEvent(event):
+    try:
+        config._RunStats['logFile'].write(event)
+    except Exception as e:
+        print(f"Event Logging Error:\n{e}")
+
+    if config._RunStats['flags']['verbose'] == 1:
+        print(event)

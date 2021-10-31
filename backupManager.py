@@ -25,8 +25,9 @@ def processBackup():
 
                 # os.makedirs(targetSubdir, exist_ok=True)
                 # shutil.copy2(srcFullPath, targetFile)
-                print(f"{'Source:': <13} {srcFile}\n{'OutputSubdir:': <13} {targetFile}\n")
+                logEvent(f"{'Source:': <13} {srcFile}\n{'OutputSubdir:': <13} {targetFile}\n")
             except OSError as oe:
+                logEvent(f"OS Error\nSrcFile: {srcFile}:\n\n{oe}")
                 print(f"\n{oe}\n\nContinue to next file? (Y/N):", file=sys.stderr)
                 if getYN():
                     continue
@@ -47,7 +48,10 @@ def main():
         print (e)
     except KeyboardInterrupt:
         sumReport()
-    sys.exit(0)
+    finally:
+        if config._RunStats['logFile']:
+            config._RunStats['logFile'].close()
+        sys.exit(0)
         
 if __name__ == '__main__':
     main()

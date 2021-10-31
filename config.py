@@ -5,6 +5,7 @@ def init():
                 'totSize':0,
                 'hashAlgo':'crc32',
                 'logFilePath': '',
+                'logFile': None,
                 'fileDict': {},
                 'flags':{
                     'move': False,
