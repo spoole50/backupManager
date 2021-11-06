@@ -9,6 +9,12 @@ from timeit import default_timer as timer
 import config
 
 def generateParse():
+    '''
+    Defines program arguments and generates argumentParser object
+
+        Returns:
+            args (argparse.ArgumentParser): Argument parser with all defined arguments
+    '''
     parser = argparse.ArgumentParser()
     parser.add_argument('SRC',
                         type=str,
@@ -32,6 +38,14 @@ def generateParse():
     return args
 
 def initLog(logPath):
+    '''
+    Validate and initialie logging file
+
+        Parameters:
+            logPath (str): Path name or location for log file
+    '''
+    if os.path.isdir(logPath):
+        logPath = os.path.join(logPath, 'bM.log')
     try:
         lgFile = open(logPath, 'a+')
         config._RunStats['logFile'] = lgFile
@@ -44,13 +58,25 @@ By User: {os.path.split(os.path.expanduser('~'))[-1]}\n\n""")
         raise KeyboardInterrupt
 
 def parseArgs():
+    '''
+    Parse program arguments
+        Validate and set SRC and TARGET paths
+        Set appropriate global variables/flags based on arguments
+
+        Return:
+            srcPath (str): Source file path for files to be copied/moved. Refered to as SRC in arguments
+            targetPath (str): Target file path for destination of copy/move operation. Refered to as TARGET in arguments
+    '''
     args = generateParse()
     srcPath = os.path.abspath(args.SRC)
     targetPath = os.path.abspath(args.TARGET)
     for path in [srcPath, targetPath]:
         if not os.path.isdir(path):
-            print(f"{path}\nNot a valid directory path, please try again")
-            raise KeyboardInterrupt
+            try:
+                os.makedirs(path, exist_ok=True)
+            except:
+                print(f"{path}\nNot a valid directory path, please try again")
+                raise KeyboardInterrupt
 
     if args.algorithm is not None:
         config._RunStats['hashAlgo'] = args.algorithm
@@ -62,21 +88,34 @@ def parseArgs():
     
     config._RunStats['flags']['verbose'] = args.verbose
     config._RunStats['flags']['yes'] = args.yes
-    # if args.verbose:
-    #     config._RunStats['flags']['verbose'] = int(args.verbose)
-    # else:
-    #     config._RunStats['flags']['verbose'] = 0
 
     return srcPath, targetPath
 
-def sizeof_fmt(num, suffix="B"):
+def sizeof_fmt(num):
+    '''
+    Format File Sizes
+
+        Parameters:
+            num (int/float): Base file size in bytes
+
+        Returns:
+            (str): Formatted, human readable file size string
+    '''
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]: 
         if abs(num) < 1024.0:
-            return f"{num:3.1f}{unit}{suffix}"
+            return f"{num:3.1f}{unit}B"
         num /= 1024.0
-    return f"{num:.1f}Yi{suffix}"
+    return f"{num:.1f}YiB"
 
 def genHash(fName, hashAlgo, blockChunk=128, verbose=None):
+    '''
+    Generate formatted file hash
+
+        Arguments:
+            fName (str): File name to be hashed
+            hashAlgo (str): Name of hash algorithm to be used
+            blockChunk (int): 
+    '''
     resHash = 0
     read_data = 1
     fSize = os.path.getsize(fName)
@@ -95,7 +134,7 @@ def genHash(fName, hashAlgo, blockChunk=128, verbose=None):
     if hashAlgo != 'crc32':
         resHash = _hash.hexdigest()
     
-    logEvent(f"{resHash} - {sizeof_fmt(fSize)} - {fName}")
+    logEvent(f"{resHash} - {sizeof_fmt(fSize)}")
     return resHash, fSize
 
 def getYN():
@@ -106,14 +145,24 @@ def getYN():
         return False
 
 def sumReport(printDict=False):
+    '''
+    Generate copy/move operation summary report
+
+        Arguments:
+            printDict (bool): Print file hash dicitonary. Mostly for debug/testing currently. Sends formatted string to logging function
+    '''
     totalTime = timedelta(seconds=timer() - config._RunStats['start'])
 
     logEvent(f"""\n\nSummary Report:
-    Elapsed Time: {str(totalTime):10.10s}
-    Files Scanned: {config._RunStats['totFiles']}
-    Total Size: {sizeof_fmt(config._RunStats['totSize'])}
-    Avg. Transfer Speed: {sizeof_fmt(config._RunStats['totSize']/totalTime.total_seconds())}/s
     File Hash Algorithm: {config._RunStats['hashAlgo']}
+    Elapsed Time: {str(totalTime):10.10s}
+    -----Scan-----
+    \tFiles Scanned: {config._RunStats['totFiles']}
+    \tTotal Size: {sizeof_fmt(config._RunStats['totSize'])}
+    ---Transfer---
+    \tFiles Transfered: {config._RunStats['totFiles_trans']} ({config._RunStats['totFiles_trans']/config._RunStats['totFiles'] * 100:.0f})%
+    \tTotal Size Transfered: {sizeof_fmt(config._RunStats['totSize_trans'])}
+    \tAvg. Transfer Speed: {sizeof_fmt(config._RunStats['totSize_trans']/totalTime.total_seconds())}/s
     """)
 
     if printDict:
@@ -122,6 +171,12 @@ def sumReport(printDict=False):
         pp.pprint(config._RunStats['fileDict'])
 
 def logEvent(event):
+    '''
+    Add program operational events/errors to log and/or output
+
+        Parameters:
+            event (str): Formatted string detailing and event or error in program. Inserts into log file and prints if verbosity is enabled
+    '''
     try:
         config._RunStats['logFile'].write(event + '\n')
     except Exception as e:

@@ -1,3 +1,5 @@
+import shutil
+
 from bmHelper import *
 import config
 
@@ -10,7 +12,6 @@ def processBackup():
                 srcFile = os.path.join(subdir, cFile)
                 targetSubdir = os.path.join(targetPath, os.path.relpath(subdir, srcPath))
                 targetFile = os.path.join(targetSubdir, cFile)
-                # targetFile = os.path.join(targetPath, os.path.relpath(os.path.join(subdir, cFile), srcPath))
 
                 # Generate Current File Hash
                 crc_hash, tSize = genHash(srcFile, config._RunStats['hashAlgo'], verbose=1)
@@ -18,13 +19,15 @@ def processBackup():
                 # Add to File Hash Dictionary
                 if crc_hash not in config._RunStats['fileDict']:
                     config._RunStats['fileDict'][crc_hash] = [srcFile]
+                    os.makedirs(targetSubdir, exist_ok=True)
+                    shutil.copy2(srcFile, targetFile)
+                    config._RunStats['totFiles_trans'] += 1
+                    config._RunStats['totSize_trans'] += tSize
                 else:
                     config._RunStats['fileDict'][crc_hash].append(srcFile)
                 config._RunStats['totSize'] += tSize
                 config._RunStats['totFiles'] += 1
-
-                # os.makedirs(targetSubdir, exist_ok=True)
-                # shutil.copy2(srcFullPath, targetFile)
+                
                 logEvent(f"{'Source:': <13} {srcFile}\n{'OutputSubdir:': <13} {targetFile}\n")
             except OSError as oe:
                 logEvent(f"OS Error\nSrcFile: {srcFile}:\n\n{oe}")
