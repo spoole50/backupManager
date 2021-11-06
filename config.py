@@ -4,10 +4,10 @@ def init():
                 'totFiles':0,
                 'totSize':0,
                 'hashAlgo':'crc32',
-                'logFilePath': '',
                 'logFile': None,
                 'fileDict': {},
                 'flags':{
                     'move': False,
-                    'verbose': 0
+                    'verbose': False,
+                    'yes': False
                 }}

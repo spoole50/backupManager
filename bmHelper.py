@@ -23,8 +23,11 @@ def generateParse():
                         type=str,
                         help='Output Path for log file')
     parser.add_argument('-v', '--verbose',
-                        type=int,
+                        action='store_true',
                         help="Verbosity level (0-1), Default 0")
+    parser.add_argument('-y', '--yes',
+                        action='store_true',
+                        help="Automatically Say YES to bypass any file errors (files will be skipped)")
     args = parser.parse_args()
     return args
 
@@ -57,10 +60,12 @@ def parseArgs():
     else:
         initLog(os.path.join(targetPath, 'bM.log'))
     
-    if args.verbose:
-        config._RunStats['flags']['verbose'] = int(args.verbose)
-    else:
-        config._RunStats['flags']['verbose'] = 0
+    config._RunStats['flags']['verbose'] = args.verbose
+    config._RunStats['flags']['yes'] = args.yes
+    # if args.verbose:
+    #     config._RunStats['flags']['verbose'] = int(args.verbose)
+    # else:
+    #     config._RunStats['flags']['verbose'] = 0
 
     return srcPath, targetPath
 
@@ -118,9 +123,9 @@ def sumReport(printDict=False):
 
 def logEvent(event):
     try:
-        config._RunStats['logFile'].write(event)
+        config._RunStats['logFile'].write(event + '\n')
     except Exception as e:
         print(f"Event Logging Error:\n{e}")
 
-    if config._RunStats['flags']['verbose'] == 1:
+    if config._RunStats['flags']['verbose']:
         print(event)

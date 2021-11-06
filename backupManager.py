@@ -29,7 +29,7 @@ def processBackup():
             except OSError as oe:
                 logEvent(f"OS Error\nSrcFile: {srcFile}:\n\n{oe}")
                 print(f"\n{oe}\n\nContinue to next file? (Y/N):", file=sys.stderr)
-                if getYN():
+                if config._RunStats['flags']['yes'] or getYN():
                     continue
                 else:
                     raise KeyboardInterrupt
