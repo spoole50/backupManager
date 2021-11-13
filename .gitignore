@@ -1,3 +1,4 @@
 __pycache__/
 findDupSongs2.py
 *.pyc
+.vscode/

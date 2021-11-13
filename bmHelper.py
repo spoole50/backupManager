@@ -25,7 +25,7 @@ def generateParse():
     parser.add_argument('-a', '--algorithm',
                         type=str,
                         help='Algorithm to utilize for generation of file hashes')
-    parser.add_argument('-o', '--logOutput',
+    parser.add_argument('-o', '--outputLog',
                         type=str,
                         help='Output Path for log file')
     parser.add_argument('-v', '--verbose',
@@ -33,8 +33,14 @@ def generateParse():
                         help="Verbosity level (0-1), Default 0")
     parser.add_argument('-y', '--yes',
                         action='store_true',
-                        help="Automatically Say YES to bypass any file errors (files will be skipped)")
-    args = parser.parse_args()
+                        help='Automatically Say YES to bypass any file errors (files w/errors will be skipped)')
+    parser.add_argument('-dr', '--dryRun',
+                        action='store_true',
+                        help='Test current parameters and run operation printing source/destination without actual copy/move operation')
+    try:
+        args = parser.parse_args()
+    except argparse.ArgumentError as e:
+        print(f"ArgParse Error:\n{e}")
     return args
 
 def initLog(logPath):
@@ -54,8 +60,7 @@ def initLog(logPath):
 By User: {os.path.split(os.path.expanduser('~'))[-1]}\n\n""")
 
     except Exception as e:
-        print(f"OpenLogFileError:\n{e}")
-        raise KeyboardInterrupt
+        raise Exception(f"OpenLogFileError:\n{e}")
 
 def parseArgs():
     '''
@@ -75,19 +80,19 @@ def parseArgs():
             try:
                 os.makedirs(path, exist_ok=True)
             except:
-                print(f"{path}\nNot a valid directory path, please try again")
-                raise KeyboardInterrupt
+                raise Exception(f"{path}\nNot a valid directory path, please try again")
 
     if args.algorithm is not None:
         config._RunStats['hashAlgo'] = args.algorithm
 
-    if args.logOutput is not None:
-        initLog(os.path.abspath(args.logOutput))
+    if args.outputLog is not None:
+        config._RunStats['logFile'] = os.path.abspath(args.outputLog)
     else:
-        initLog(os.path.join(targetPath, 'bM.log'))
+        config._RunStats['logFile'] = os.path.join(targetPath, 'bM.log')
     
     config._RunStats['flags']['verbose'] = args.verbose
     config._RunStats['flags']['yes'] = args.yes
+    config._RunStats['flags']['dry'] = args.dryRun
 
     return srcPath, targetPath
 
@@ -177,10 +182,11 @@ def logEvent(event):
         Parameters:
             event (str): Formatted string detailing and event or error in program. Inserts into log file and prints if verbosity is enabled
     '''
-    try:
-        config._RunStats['logFile'].write(event + '\n')
-    except Exception as e:
-        print(f"Event Logging Error:\n{e}")
+    if config._RunStats['logFile'] and not isinstance(config._RunStats['logFile'], str):
+        try:
+            config._RunStats['logFile'].write(event + '\n')
+        except Exception as e:
+            print(f"Event Logging Error:\n{e}")
 
     if config._RunStats['flags']['verbose']:
         print(event)

@@ -8,8 +8,10 @@ def init():
                 'hashAlgo':'crc32',
                 'logFile': None,
                 'fileDict': {},
+                'hashDict': {},
                 'flags':{
                     'move': False,
                     'verbose': False,
-                    'yes': False
+                    'yes': False,
+                    'dry': False
                 }}

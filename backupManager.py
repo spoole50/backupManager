@@ -1,10 +1,11 @@
+from argparse import ArgumentError
 import shutil
 
 from bmHelper import *
 import config
 
-def processBackup():
-    srcPath, targetPath = parseArgs()
+def processBackup(srcPath, targetPath):
+    initLog(config._RunStats['logFile'])
     for subdir, dirs, files in os.walk(srcPath):
         for cFile in files:
             try:
@@ -17,17 +18,19 @@ def processBackup():
                 crc_hash, tSize = genHash(srcFile, config._RunStats['hashAlgo'], verbose=1)
 
                 # Add to File Hash Dictionary
-                if crc_hash not in config._RunStats['fileDict']:
-                    config._RunStats['fileDict'][crc_hash] = [srcFile]
-                    os.makedirs(targetSubdir, exist_ok=True)
-                    shutil.copy2(srcFile, targetFile)
-                    config._RunStats['totFiles_trans'] += 1
+                if crc_hash not in config._RunStats['hashDict']:
+                    config._RunStats['hashDict'][crc_hash] = [srcFile]
+                    config._RunStats['fileDict'][srcFile] = crc_hash
+                    if not config._RunStats['flags']['dry']:
+                        os.makedirs(targetSubdir, exist_ok=True)
+                        shutil.copy2(srcFile, targetFile)
                     config._RunStats['totSize_trans'] += tSize
+                    config._RunStats['totFiles_trans'] += 1
                 else:
-                    config._RunStats['fileDict'][crc_hash].append(srcFile)
+                    config._RunStats['hashDict'][crc_hash].append(srcFile)
+                    config._RunStats['fileDict'][srcFile] = crc_hash
                 config._RunStats['totSize'] += tSize
                 config._RunStats['totFiles'] += 1
-                
                 logEvent(f"{'Source:': <13} {srcFile}\n{'OutputSubdir:': <13} {targetFile}\n")
             except OSError as oe:
                 logEvent(f"OS Error\nSrcFile: {srcFile}:\n\n{oe}")
@@ -43,18 +46,14 @@ def main():
     config.init()
     config._RunStats['start'] = timer()
     try:
-        processBackup()
-        sumReport()
+        processBackup(*parseArgs())
     except OSError as e:
-        sumReport()
         print("\nOS Error:")
-        print (e)
-    except KeyboardInterrupt:
-        sumReport()
+        print (e) 
     finally:
-        if config._RunStats['logFile']:
+        sumReport()
+        if config._RunStats['logFile'] and not isinstance(config._RunStats['logFile'], str):
             config._RunStats['logFile'].close()
-        sys.exit(0)
         
 if __name__ == '__main__':
     main()
