@@ -1,4 +1,5 @@
 import sys
+import json
 import argparse
 import hashlib
 import os
@@ -37,6 +38,12 @@ def generateParse():
     parser.add_argument('-dr', '--dryRun',
                         action='store_true',
                         help='Test current parameters and run operation printing source/destination without actual copy/move operation')
+    parser.add_argument('-m', '--move',
+                        action='store_true',
+                        help='Move files instead of default copy behavior')
+    parser.add_argument('-c', '--condense',
+                        action='store_true',
+                        help='Copy/move all files to root of target directory instead of default maintaining of file hierarchy')
     try:
         args = parser.parse_args()
     except argparse.ArgumentError as e:
@@ -81,6 +88,8 @@ def parseArgs():
                 os.makedirs(path, exist_ok=True)
             except:
                 raise Exception(f"{path}\nNot a valid directory path, please try again")
+    config._RunStats['src'] = srcPath
+    config._RunStats['target'] = targetPath
 
     if args.algorithm is not None:
         config._RunStats['hashAlgo'] = args.algorithm
@@ -93,6 +102,8 @@ def parseArgs():
     config._RunStats['flags']['verbose'] = args.verbose
     config._RunStats['flags']['yes'] = args.yes
     config._RunStats['flags']['dry'] = args.dryRun
+    config._RunStats['flags']['move'] = args.move
+    config._RunStats['flags']['condense'] = args.condense
 
     return srcPath, targetPath
 
@@ -152,23 +163,28 @@ def getYN():
 def sumReport(printDict=False):
     '''
     Generate copy/move operation summary report
+    Sends formatted string to logging function
 
         Arguments:
-            printDict (bool): Print file hash dicitonary. Mostly for debug/testing currently. Sends formatted string to logging function
+            printDict (bool): Print file hash dicitonary. Mostly for debug/testing currently.
     '''
     totalTime = timedelta(seconds=timer() - config._RunStats['start'])
 
     logEvent(f"""\n\nSummary Report:
     File Hash Algorithm: {config._RunStats['hashAlgo']}
-    Elapsed Time: {str(totalTime):10.10s}
-    -----Scan-----
-    \tFiles Scanned: {config._RunStats['totFiles']}
-    \tTotal Size: {sizeof_fmt(config._RunStats['totSize'])}
-    ---Transfer---
-    \tFiles Transfered: {config._RunStats['totFiles_trans']} ({config._RunStats['totFiles_trans']/config._RunStats['totFiles'] * 100:.0f})%
-    \tTotal Size Transfered: {sizeof_fmt(config._RunStats['totSize_trans'])}
-    \tAvg. Transfer Speed: {sizeof_fmt(config._RunStats['totSize_trans']/totalTime.total_seconds())}/s
-    """)
+    Elapsed Time: {str(totalTime):10.10s}""")
+    if config._RunStats['totFiles'] and config._RunStats['totSize']:
+        logEvent(f"""
+        -----Scan-----
+        \tFiles Scanned: {config._RunStats['totFiles']}
+        \tTotal Size: {sizeof_fmt(config._RunStats['totSize'])}
+        ---Transfer---
+        \tFiles Transfered: {config._RunStats['totFiles_trans']} ({config._RunStats['totFiles_trans']/config._RunStats['totFiles'] * 100:.0f})%
+        \tTotal Size Transfered: {sizeof_fmt(config._RunStats['totSize_trans'])}
+        \tAvg. Transfer Speed: {sizeof_fmt(config._RunStats['totSize_trans']/totalTime.total_seconds())}/s
+        """)
+    else:
+        logEvent(f"No Files Transferred")
 
     if printDict:
         print("\nFile Hash Dictionary:")
@@ -190,3 +206,13 @@ def logEvent(event):
 
     if config._RunStats['flags']['verbose']:
         print(event)
+
+def endProgram():
+    for dName in ['hashDict' ,'fileDict']:
+        tDict = config._RunStats[dName]
+        if tDict:
+            with open(os.path.join(config._RunStats['target'], f"{dName}.json"), 'w') as outFile:
+                json.dump(tDict, outFile)
+
+    if config._RunStats['logFile'] and not isinstance(config._RunStats['logFile'], str):
+            config._RunStats['logFile'].close()

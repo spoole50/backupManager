@@ -1,5 +1,5 @@
 def init():
-    global _RunStats 
+    global _RunStats
     _RunStats = {'start':0,
                 'totFiles':0,
                 'totSize':0,
@@ -9,9 +9,12 @@ def init():
                 'logFile': None,
                 'fileDict': {},
                 'hashDict': {},
+                'src': None,
+                'target': None,
                 'flags':{
                     'move': False,
                     'verbose': False,
                     'yes': False,
-                    'dry': False
+                    'dry': False,
+                    'condense': False
                 }}
