@@ -9,7 +9,6 @@ import config as cg
 def processBackup():
     srcPath = rs['src']
     targetPath = rs['target']
-    initLog(rs['logFile'])
     for subdir, dirs, files in os.walk(srcPath):
         for cFile in files:
             try:
@@ -27,7 +26,6 @@ def processBackup():
                 # Add to File Hash Dictionary
                 if crc_hash not in rs['hashDict']:
                     rs['hashDict'][crc_hash] = [srcFile]
-                    rs['fileDict'][srcFile] = crc_hash
                     if not rs['flags']['dry']:
                         if rs['flags']['move']:
                             os.makedirs(targetSubdir, exist_ok=True)
@@ -40,7 +38,7 @@ def processBackup():
                     rs['totFiles_trans'] += 1
                 else:
                     rs['hashDict'][crc_hash].append(srcFile)
-                    rs['fileDict'][srcFile] = crc_hash
+                rs['fileDict'][srcFile] = crc_hash
                 rs['totSize'] += tSize
                 rs['totFiles'] += 1
                 logEvent(f"{'Source:': <13} {srcFile}\n{'Target:': <13} {targetFile}\n")

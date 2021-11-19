@@ -7,7 +7,7 @@ import pprint
 from zlib import crc32
 from datetime import timedelta, datetime
 from timeit import default_timer as timer
-import config
+import config as cg
 
 def generateParse():
     '''
@@ -29,6 +29,9 @@ def generateParse():
     parser.add_argument('-o', '--outputLog',
                         type=str,
                         help='Output Path for log file')
+    parser.add_argument('-d', '--dicts',
+                        type=str,
+                        help='Path to check for existing file/hash dicts')
     parser.add_argument('-v', '--verbose',
                         action='store_true',
                         help="Verbosity level (0-1), Default 0")
@@ -60,8 +63,8 @@ def initLog(logPath):
     if os.path.isdir(logPath):
         logPath = os.path.join(logPath, 'bM.log')
     try:
-        lgFile = open(logPath, 'a+')
-        config._RunStats['logFile'] = lgFile
+        lgFile = open(logPath, 'w')
+        cg._RunStats['logFile'] = lgFile
 
         lgFile.write(f"""\n{datetime.now():%Y-%b-%d %H:%M:%S}
 By User: {os.path.split(os.path.expanduser('~'))[-1]}\n\n""")
@@ -83,29 +86,32 @@ def parseArgs():
     srcPath = os.path.abspath(args.SRC)
     targetPath = os.path.abspath(args.TARGET)
     for path in [srcPath, targetPath]:
-        if not os.path.isdir(path):
-            try:
-                os.makedirs(path, exist_ok=True)
-            except:
-                raise Exception(f"{path}\nNot a valid directory path, please try again")
-    config._RunStats['src'] = srcPath
-    config._RunStats['target'] = targetPath
+        try:
+            os.makedirs(path, exist_ok=True)
+        except:
+            raise Exception(f"{path}\nNot a valid directory path, please try again")
+    cg._RunStats['src'] = srcPath
+    cg._RunStats['target'] = targetPath
 
     if args.algorithm is not None:
-        config._RunStats['hashAlgo'] = args.algorithm
+        cg._RunStats['hashAlgo'] = args.algorithm
 
     if args.outputLog is not None:
-        config._RunStats['logFile'] = os.path.abspath(args.outputLog)
+        initLog(os.path.abspath(args.outputLog))
     else:
-        config._RunStats['logFile'] = os.path.join(targetPath, 'bM.log')
+        initLog(os.path.join(targetPath, f"bM_{datetime.now():%Y%m%d%H%M%S}.log"))
     
-    config._RunStats['flags']['verbose'] = args.verbose
-    config._RunStats['flags']['yes'] = args.yes
-    config._RunStats['flags']['dry'] = args.dryRun
-    config._RunStats['flags']['move'] = args.move
-    config._RunStats['flags']['condense'] = args.condense
-
-    return srcPath, targetPath
+    # if args.dicts is not None:
+    #     checkForDicts(os.path.abspath(args.dicts))
+    # else:
+    #     checkForDicts(srcPath)
+    
+    cg._RunStats['flags']['verbose'] = args.verbose
+    cg._RunStats['flags']['yes'] = args.yes
+    cg._RunStats['flags']['dry'] = args.dryRun
+    cg._RunStats['flags']['move'] = args.move
+    cg._RunStats['flags']['condense'] = args.condense
+    return
 
 def sizeof_fmt(num):
     '''
@@ -149,9 +155,11 @@ def genHash(fName, hashAlgo, blockChunk=128, verbose=None):
                 _hash.update(read_data)
     if hashAlgo != 'crc32':
         resHash = _hash.hexdigest()
+    else:
+        resHash = hex(resHash & 0xffffffff)
     
     logEvent(f"{resHash} - {sizeof_fmt(fSize)}")
-    return resHash, fSize
+    return str(resHash), fSize
 
 def getYN():
     ans = input()
@@ -168,20 +176,20 @@ def sumReport(printDict=False):
         Arguments:
             printDict (bool): Print file hash dicitonary. Mostly for debug/testing currently.
     '''
-    totalTime = timedelta(seconds=timer() - config._RunStats['start'])
+    totalTime = timedelta(seconds=timer() - cg._RunStats['start'])
 
     logEvent(f"""\n\nSummary Report:
-    File Hash Algorithm: {config._RunStats['hashAlgo']}
+    File Hash Algorithm: {cg._RunStats['hashAlgo']}
     Elapsed Time: {str(totalTime):10.10s}""")
-    if config._RunStats['totFiles'] and config._RunStats['totSize']:
+    if cg._RunStats['totFiles'] and cg._RunStats['totSize']:
         logEvent(f"""
         -----Scan-----
-        \tFiles Scanned: {config._RunStats['totFiles']}
-        \tTotal Size: {sizeof_fmt(config._RunStats['totSize'])}
+        \tFiles Scanned: {cg._RunStats['totFiles']}
+        \tTotal Size: {sizeof_fmt(cg._RunStats['totSize'])}
         ---Transfer---
-        \tFiles Transfered: {config._RunStats['totFiles_trans']} ({config._RunStats['totFiles_trans']/config._RunStats['totFiles'] * 100:.0f})%
-        \tTotal Size Transfered: {sizeof_fmt(config._RunStats['totSize_trans'])}
-        \tAvg. Transfer Speed: {sizeof_fmt(config._RunStats['totSize_trans']/totalTime.total_seconds())}/s
+        \tFiles Transfered: {cg._RunStats['totFiles_trans']} ({cg._RunStats['totFiles_trans']/cg._RunStats['totFiles'] * 100:.0f})%
+        \tTotal Size Transfered: {sizeof_fmt(cg._RunStats['totSize_trans'])}
+        \tAvg. Transfer Speed: {sizeof_fmt(cg._RunStats['totSize_trans']/totalTime.total_seconds())}/s
         """)
     else:
         logEvent(f"No Files Transferred")
@@ -189,7 +197,8 @@ def sumReport(printDict=False):
     if printDict:
         print("\nFile Hash Dictionary:")
         pp = pprint.PrettyPrinter()
-        pp.pprint(config._RunStats['fileDict'])
+        pp.pprint(cg._RunStats['fileDict'])
+    return
 
 def logEvent(event):
     '''
@@ -198,21 +207,39 @@ def logEvent(event):
         Parameters:
             event (str): Formatted string detailing and event or error in program. Inserts into log file and prints if verbosity is enabled
     '''
-    if config._RunStats['logFile'] and not isinstance(config._RunStats['logFile'], str):
+    if cg._RunStats['logFile'] and not isinstance(cg._RunStats['logFile'], str):
         try:
-            config._RunStats['logFile'].write(event + '\n')
+            cg._RunStats['logFile'].write(event + '\n')
         except Exception as e:
             print(f"Event Logging Error:\n{e}")
 
-    if config._RunStats['flags']['verbose']:
+    if cg._RunStats['flags']['verbose']:
         print(event)
+    return
 
 def endProgram():
     for dName in ['hashDict' ,'fileDict']:
-        tDict = config._RunStats[dName]
+        tDict = cg._RunStats[dName]
         if tDict:
-            with open(os.path.join(config._RunStats['target'], f"{dName}.json"), 'w') as outFile:
+            with open(os.path.join(cg._RunStats['target'], f"{dName}.json"), 'w') as outFile:
                 json.dump(tDict, outFile)
 
-    if config._RunStats['logFile'] and not isinstance(config._RunStats['logFile'], str):
-            config._RunStats['logFile'].close()
+    if cg._RunStats['logFile'] and not isinstance(cg._RunStats['logFile'], str):
+            cg._RunStats['logFile'].close()
+    return
+
+def checkForDicts(path):
+    if not os.path.isdir(path):
+        path = cg._RunStats['src']
+    for dName in ['hashDict' ,'fileDict']:
+        dPath = os.path.join(path, f"{dName}.json")
+        logEvent(f"Checking for JSON at {dPath}")
+        if os.path.isfile(dPath):
+            try:
+                with open(dPath) as dFile:
+                    tJson = json.load(dFile)
+                cg._RunStats[dName] = tJson
+                logEvent(f"Successfully Loaded {dName} dict from JSON")
+            except Exception as e:
+                logEvent(f"JSON Dict Load Error:\n{e}")
+    return
